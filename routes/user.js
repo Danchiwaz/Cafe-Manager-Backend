@@ -2,6 +2,9 @@ const express = require("express");
 const connection = require("../connection");
 const jwt = require("jsonwebtoken");
 const nodemailer = require("nodemailer");
+const { response } = require("..");
+const auth = require("../services/authentication");
+const checkUserRole = require("../services/checkRole");
 require("dotenv").config();
 
 const router = express.Router();
@@ -80,9 +83,8 @@ router.post("/login", (req, res) => {
     }
   });
 });
-/**
- * Endpoint for resetting Password
- */
+
+// setting up the nodemailer
 var transporter = nodemailer.createTransport({
   service: "gmail",
   auth: {
@@ -90,7 +92,11 @@ var transporter = nodemailer.createTransport({
     pass: process.env.PASSWORD,
   },
 });
+// end of setting up nodemailer
 
+/**
+ * Endpoint for resetting Password
+ */
 router.post("/forgotPassword", (req, res) => {
   const user = req.body;
   query = "SELECT email, password FROM user WHERE email = ?";
@@ -120,5 +126,53 @@ router.post("/forgotPassword", (req, res) => {
     }
   });
 });
+
+/**
+ * Enpoint to get all the users
+ */
+router.get("/getAllUsers", auth.authenticateToken, function (req, res) {
+  let query =
+    "SELECT id,name,email,contactNumber,status FROM user WHERE role='user'";
+  connection.query(query, (err, results) => {
+    if (!err) {
+      return res.status(200).json(results);
+    } else {
+      res.status(500).json(err);
+    }
+  });
+});
+
+/**
+ * Endpoint to update status of a specific user
+ */
+
+router.patch("/update", auth.authenticateToken, (req, res) => {
+  const user = req.body;
+  var query = "UPDATE user SET status =? WHERE id=?";
+
+  connection.query(query, [user.status, user.id], (err, results) => {
+    if (!err) {
+      if (results.affectedRows == 0) {
+        return res.status(404).json({ message: "user id does not exist" });
+      }
+      return res.status(200).json({ message: "User updated Successfully" });
+    } else {
+      return results.status(500).json(err);
+    }
+  });
+});
+
+/**
+ * Endpoint to check token
+ */
+
+router.get("/checkToken", auth.authenticateToken, (req, res) => {
+  return res.status(200).json({ message: true });
+});
+/**
+ * Endpoint to allow user to change the Password
+ */
+
+// router.post()
 
 module.exports = router;
