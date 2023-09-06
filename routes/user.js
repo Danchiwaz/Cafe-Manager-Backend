@@ -2,9 +2,9 @@ const express = require("express");
 const connection = require("../connection");
 const jwt = require("jsonwebtoken");
 const nodemailer = require("nodemailer");
-const { response } = require("..");
 const auth = require("../services/authentication");
 const checkUserRole = require("../services/checkRole");
+const checkRole = require("../services/checkRole");
 require("dotenv").config();
 
 const router = express.Router();
@@ -130,48 +130,99 @@ router.post("/forgotPassword", (req, res) => {
 /**
  * Enpoint to get all the users
  */
-router.get("/getAllUsers", auth.authenticateToken, function (req, res) {
-  let query =
-    "SELECT id,name,email,contactNumber,status FROM user WHERE role='user'";
-  connection.query(query, (err, results) => {
-    if (!err) {
-      return res.status(200).json(results);
-    } else {
-      res.status(500).json(err);
-    }
-  });
-});
+router.get(
+  "/getAllUsers",
+  auth.authenticateToken,
+  checkRole.checkRole,
+  function (req, res) {
+    let query =
+      "SELECT id,name,email,contactNumber,status FROM user WHERE role='user'";
+    connection.query(query, (err, results) => {
+      if (!err) {
+        return res.status(200).json(results);
+      } else {
+        res.status(500).json(err);
+      }
+    });
+  }
+);
 
 /**
  * Endpoint to update status of a specific user
  */
 
-router.patch("/update", auth.authenticateToken, (req, res) => {
-  const user = req.body;
-  var query = "UPDATE user SET status =? WHERE id=?";
+router.patch(
+  "/update",
+  auth.authenticateToken,
+  checkRole.checkRole,
+  (req, res) => {
+    const user = req.body;
+    var query = "UPDATE user SET status =? WHERE id=?";
 
-  connection.query(query, [user.status, user.id], (err, results) => {
-    if (!err) {
-      if (results.affectedRows == 0) {
-        return res.status(404).json({ message: "user id does not exist" });
+    connection.query(query, [user.status, user.id], (err, results) => {
+      if (!err) {
+        if (results.affectedRows == 0) {
+          return res.status(404).json({ message: "user id does not exist" });
+        }
+        return res.status(200).json({ message: "User updated Successfully" });
+      } else {
+        return results.status(500).json(err);
       }
-      return res.status(200).json({ message: "User updated Successfully" });
-    } else {
-      return results.status(500).json(err);
-    }
-  });
-});
+    });
+  }
+);
 
 /**
  * Endpoint to check token
  */
 
-router.get("/checkToken", auth.authenticateToken, (req, res) => {
-  return res.status(200).json({ message: true });
-});
+router.get(
+  "/checkToken",
+  auth.authenticateToken,
+  checkRole.checkRole,
+  (req, res) => {
+    return res.status(200).json({ message: true });
+  }
+);
 /**
  * Endpoint to allow user to change the Password
  */
+
+router.patch("/changePassword", auth.authenticateToken, (req, res) => {
+  const user = req.body;
+  const email = res.locals.email;
+
+  query = "SELECT * FROM user WHERE email=? AND password=?";
+
+  connection.query(query, [email, user.oldPassword], (err, results) => {
+    if (!err) {
+      if (results.length <= 0) {
+        return res.status(400).json({ message: "Incorrect Old Password" });
+      } else if (results[0].password === user.oldPassword) {
+        query = "UPDATE user SET password=? WHERE email=?";
+        connection.query(
+          query,
+          [user.newPassword, email],
+          (err, results) => {
+            if (!err) {
+              return res
+                .status(200)
+                .json({ message: "User Password Updated Successfully" });
+            } else {
+              return res.status(400).json(err);
+            }
+          }
+        );
+      } else {
+        return res
+          .status(400)
+          .json({ message: "Something went wrong,  Please try again later" });
+      }
+    } else {
+      return res.status(500).json(err);
+    }
+  });
+});
 
 // router.post()
 

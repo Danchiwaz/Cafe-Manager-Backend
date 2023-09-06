@@ -12,6 +12,8 @@ app.use(express.urlencoded({extended:true}));
 app.use(cors());
 
 
+
+
 // configuring the routes 
 app.use("/user", userRoute);
 
